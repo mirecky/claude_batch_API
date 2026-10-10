@@ -151,17 +151,27 @@ def load_roster(path, classes=None):
     return out
 
 def name_score(read, entry):
+    """0–1. Okrem celkovej podobnosti porovnáva po slovách: každé prečítané slovo musí sedieť s niektorým slovom
+    zo zoznamu (iniciála „J.“ s „Ján“), slová navyše v zozname nevadia – žiak s dvoma krstnými menami
+    často napíše len jedno („Filip Rapčan“ ~ „Rapčan, Filip Róbert“)."""
     a, b = plain(read), plain(entry)
     sc = difflib.SequenceMatcher(None, a, b).ratio()
     ra, rb = a.split(), b.split()
-    for t in [x for x in ra if len(x) >= 3]:            # priezvisko + iniciály: „J. Pápay“ ~ „Pápay, Ján“
-        hit = next((y for y in rb if difflib.SequenceMatcher(None, t, y).ratio() >= 0.85), None)
-        if hit:
-            rest_a, rest_b = [x for x in ra if x != t], [y for y in rb if y != hit]
-            if rest_a and all(len(x) == 1 for x in rest_a) and all(any(y.startswith(x) for y in rest_b) for x in rest_a):
-                sc = max(sc, 0.9)
-            elif not rest_a:
-                sc = max(sc, 0.86)                       # len priezvisko
+    if not ra or not rb:
+        return sc
+    best, used = [], set()
+    for t in ra:                                        # najprv celé slová, každé si „zaberie“ najpodobnejšie slovo
+        if len(t) > 1:
+            r, j = max((difflib.SequenceMatcher(None, t, y).ratio(), j) for j, y in enumerate(rb))
+            best.append(r)
+            used.add(j)
+    for t in ra:                                        # iniciála musí sedieť s iným slovom („T. Tirala“ ≠ „Tirala, Damien“)
+        if len(t) == 1:
+            best.append(1.0 if any(y.startswith(t) for j, y in enumerate(rb) if j not in used) else 0.0)
+    ra = [t for t in ra if len(t) > 1] + [t for t in ra if len(t) == 1]
+    long_ok = any(len(t) >= 3 and b_ >= 0.85 for t, b_ in zip(ra, best))
+    if long_ok and min(best) >= 0.6:
+        sc = max(sc, sum(best) / len(best) * 0.95)
     return sc
 
 def match_name(read, roster):
