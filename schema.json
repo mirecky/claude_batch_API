@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "page_quality": {"type": "string", "enum": ["dobra", "citatelna_s_chybami", "zla", "prazdna"]},
+    "handwritten": {"type": "boolean"},
+    "document_type": {"type": "string", "enum": ["dotaznik", "test", "ine"]},
+    "student_name": {"type": "string", "description": "Meno a priezvisko žiaka, ak je na tejto strane; inak prázdne"},
+    "class_name": {"type": "string", "description": "Trieda, ak je uvedená (napr. I.A)"},
+    "is_first_page": {"type": "boolean", "description": "Strana začína nový dotazník/test (hlavička, meno)"},
+    "page_in_form": {"type": ["integer", "null"], "description": "Číslo strany v rámci dotazníka, ak je vytlačené"},
+    "continues_on_next": {"type": "boolean"},
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question_number": {"type": "string"},
+          "question_text": {"type": "string", "description": "Znenie otázky (skrátene stačí)"},
+          "answer": {"type": "string", "description": "Doslovná odpoveď žiaka / zvolená možnosť"},
+          "answered": {"type": "boolean"},
+          "points": {"type": ["number", "null"], "description": "Body, ak sú na strane ručne pripísané (test)"}
+        },
+        "required": ["question_number", "answer", "answered"]
+      }
+    },
+    "uncertain": {"type": "array", "items": {"type": "object", "properties": {
+      "read_as": {"type": "string"}, "alternatives": {"type": "array", "items": {"type": "string"}},
+      "where": {"type": "string"}}, "required": ["read_as"]}},
+    "page_transcription": {"type": "string"}
+  },
+  "required": ["page_quality", "handwritten", "document_type", "is_first_page", "answers", "page_transcription"]
+}

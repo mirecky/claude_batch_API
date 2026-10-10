@@ -1,0 +1,13 @@
+# Osobné údaje žiakov a výstupy behov – nikdy necommitovať
+pages/
+*.pdf
+results_*.jsonl
+summary_*.txt
+batch_*.json
+pilot.txt
+*.xlsx
+# Python
+__pycache__/
+*.pyc
+# Kľúče
+.env
