@@ -6,17 +6,20 @@
     "document_type": {"type": "string", "enum": ["dotaznik", "test", "ine"]},
     "student_name": {"type": "string", "description": "Meno a priezvisko žiaka, ak je na tejto strane; inak prázdne"},
     "class_name": {"type": "string", "description": "Trieda, ak je uvedená (napr. I.A)"},
+    "previous_school": {"type": "string", "description": "Základná škola, z ktorej žiak prichádza, ak je na tejto strane; inak prázdne"},
+    "form_date": {"type": "string", "description": "Dátum z hlavičky doslovne, ak je na tejto strane; inak prázdne"},
     "is_first_page": {"type": "boolean", "description": "Strana začína nový dotazník/test (hlavička, meno)"},
-    "page_in_form": {"type": ["integer", "null"], "description": "Číslo strany v rámci dotazníka, ak je vytlačené"},
+    "page_in_form": {"type": ["integer", "null"], "description": "Číslo strany dotazníka 1–4 podľa otázok na strane (pozri prompt); pri teste vytlačené číslo, inak null"},
     "continues_on_next": {"type": "boolean"},
     "answers": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "question_number": {"type": "string"},
+          "question_number": {"type": "string", "description": "Q1 … Q76 pri dotazníku; pri teste ako je vytlačené"},
+          "question_type": {"type": "string", "enum": ["jedna", "dve", "viac", "skala", "text"]},
           "question_text": {"type": "string", "description": "Znenie otázky (skrátene stačí)"},
-          "answer": {"type": "string", "description": "Doslovná odpoveď žiaka / zvolená možnosť"},
+          "answer": {"type": "string", "description": "Písmená možností (\"e, f\"), číslica 0–3 pri škále, alebo doslovný text – podľa pravidiel v prompte"},
           "answered": {"type": "boolean"},
           "points": {"type": ["number", "null"], "description": "Body, ak sú na strane ručne pripísané (test)"}
         },
@@ -28,5 +31,5 @@
       "where": {"type": "string"}}, "required": ["read_as"]}},
     "page_transcription": {"type": "string"}
   },
-  "required": ["page_quality", "handwritten", "document_type", "is_first_page", "answers", "page_transcription"]
+  "required": ["page_quality", "handwritten", "document_type", "is_first_page", "page_in_form", "answers", "page_transcription"]
 }
