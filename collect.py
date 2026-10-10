@@ -56,7 +56,8 @@ def main():
                     except Exception:
                         row["data"] = None; row["note"] = "bez_dat"; notes += 1
                 d = row.get("data") or {}
-                if any(isinstance(v, str) and v.strip()[:1] in "[{" for v in d.values()):
+                # len skutočný JSON v reťazci; nie prázdny reťazec ("" in "[{" je True) ani prepis začínajúci značkou [?] / [...]
+                if any(isinstance(v, str) and (v.lstrip()[:1] == "{" or v.lstrip()[:2] in ('[{', '["', '[]')) for v in d.values()):
                     row["note"] = "pole_prislo_ako_text – skontrolovať"; notes += 1
                 if m.stop_reason == "max_tokens":
                     row["note"] = "max_tokens – zvýš --max-tokens"; notes += 1

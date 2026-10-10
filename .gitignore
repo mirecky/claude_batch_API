@@ -2,6 +2,8 @@
 pages/
 *.pdf
 results_*.jsonl
+sample_*.jsonl
+sample_*.json
 summary_*.txt
 batch_*.json
 pilot.txt

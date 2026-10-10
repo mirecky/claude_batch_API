@@ -1,0 +1,13 @@
+{
+  "name": "batch-gui",
+  "version": "0.1.0",
+  "description": "Desktopové GUI pre Batch API toolkit (volá overené Python skripty).",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "44.5.1"
+  }
+}

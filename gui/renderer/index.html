@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' pages: data:; style-src 'self'; script-src 'self'">
+  <title>Batch API – dotazníky</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <h1>Batch API – dotazníky</h1>
+  <div class="chips">
+    <span class="chip" id="chip-toolkit">toolkit</span>
+    <span class="chip" id="chip-work">pracovná zložka</span>
+    <span class="chip" id="chip-key">API kľúč</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="side">
+    <button data-tab="settings" class="active"><b>1</b> Nastavenia</button>
+    <button data-tab="prepare"><b>2</b> Príprava strán</button>
+    <button data-tab="task"><b>3</b> Zadanie</button>
+    <button data-tab="run"><b>4</b> Skúška a spustenie</button>
+    <button data-tab="results"><b>5</b> Výsledky a export</button>
+  </nav>
+
+  <main>
+    <!-- 1 NASTAVENIA -->
+    <section id="tab-settings" class="tab active">
+      <h2>Nastavenia</h2>
+      <div class="card">
+        <label>Zložka toolkitu (Python skripty)</label>
+        <div class="row"><input id="toolkitDir" readonly><button id="pickToolkit">Vybrať…</button></div>
+        <p class="hint" id="toolkitInfo"></p>
+
+        <label>Pracovná zložka (sem sa ukladajú obrázky strán, výsledky a Excel)</label>
+        <div class="row"><input id="workDir" readonly><button id="pickWork">Vybrať…</button><button id="openWork">Otvoriť</button></div>
+
+        <label>Príkaz pre Python</label>
+        <div class="row"><input id="python" class="short"><button id="savePython">Uložiť</button></div>
+        <p class="hint">Na Windows <code>py</code>. Balíky: <code>py -m pip install anthropic pymupdf pillow openpyxl</code></p>
+      </div>
+
+      <div class="card">
+        <h3>API kľúč</h3>
+        <p class="hint">Kľúč sa <b>nikam neukladá</b> – drží sa len v pamäti, kým je aplikácia otvorená. Ak ho máš v premennej
+          <code>ANTHROPIC_API_KEY</code> (aplikáciu spúšťaš z toho istého okna PowerShell), načíta sa sám.</p>
+        <label>ANTHROPIC_API_KEY</label>
+        <div class="row"><input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+        <label>ANTHROPIC_WORKSPACE_ID (len ak API hlási „not scoped to a workspace“)</label>
+        <div class="row"><input id="workspaceId" placeholder="wrkspc_…" autocomplete="off"><button id="saveKey">Použiť</button><button id="clearKey" class="ghost">Zabudnúť</button></div>
+        <p class="hint" id="keyInfo"></p>
+        <div class="row"><button id="listModels" class="needs-idle">Načítať dostupné modely</button></div>
+      </div>
+    </section>
+
+    <!-- 2 PRÍPRAVA -->
+    <section id="tab-prepare" class="tab">
+      <h2>Príprava strán</h2>
+      <div class="card">
+        <label>Zložka s PDF (prehľadáva aj podzložky)</label>
+        <div class="row"><input id="pdfDir" readonly><button id="pickPdf">Vybrať…</button></div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="prepHires"> pripraviť aj 4 zväčšené štvrtiny (rukopis, <code>--hires</code>)</label>
+          <label class="inline">DPI <input id="prepDpi" type="number" min="0" max="600" value="0" class="tiny"></label>
+          <span class="hint">0 = automaticky (150, s hires 300)</span>
+        </div>
+        <div class="row"><button id="runPrepare" class="primary needs-idle">Pripraviť strány</button></div>
+      </div>
+
+      <div class="card">
+        <div class="row between">
+          <h3>Strany <span id="pageCount" class="muted"></span></h3>
+          <div class="row">
+            <select id="pdfFilter"></select>
+            <button id="reloadPages" class="ghost">Obnoviť</button>
+          </div>
+        </div>
+        <p class="hint">Na skúšku si môžeš zaškrtnúť konkrétne strany – najlepšie tie najhoršie (zlý rukopis, hustá tabuľka).</p>
+        <div class="row">
+          <span>Vybrané: <b id="selCount">0</b></span>
+          <button id="savePilot">Uložiť ako skúšobné strany</button>
+          <button id="clearSel" class="ghost">Zrušiť výber</button>
+        </div>
+        <div id="grid" class="grid"></div>
+      </div>
+    </section>
+
+    <!-- 3 ZADANIE -->
+    <section id="tab-task" class="tab">
+      <h2>Zadanie pre model</h2>
+      <div class="card">
+        <div class="row">
+          <button class="subtab active" data-file="prompt.md">prompt.md</button>
+          <button class="subtab" data-file="schema.json">schema.json</button>
+          <span class="hint" id="fileFrom"></span>
+        </div>
+        <textarea id="editor" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="saveFile" class="primary">Uložiť do pracovnej zložky</button>
+          <span class="hint">Po zmene zadania treba spraviť novú skúšku – stará prestane platiť.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 SKÚŠKA A SPUSTENIE -->
+    <section id="tab-run" class="tab">
+      <h2>Skúška a spustenie dávky</h2>
+      <div class="card">
+        <h3>Nastavenie behu</h3>
+        <div class="grid3">
+          <div>
+            <label>Model</label>
+            <select id="model"></select>
+            <p class="hint" id="modelHint"></p>
+          </div>
+          <div>
+            <label>Rozlíšenie</label>
+            <label class="check"><input type="checkbox" id="runHires"> posielať aj štvrtiny (<code>--hires</code>)</label>
+            <p class="hint" id="hiresHint"></p>
+          </div>
+          <div>
+            <label>Max. tokenov na stranu</label>
+            <input id="maxTokens" type="number" min="1000" max="64000" step="1000" value="8000" class="short">
+            <p class="hint">Fable s prepisom aj 16000.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Krok A – skúšobný beh</h3>
+        <div class="row">
+          <label class="check"><input type="radio" name="sampleSrc" value="auto" checked> automaticky
+            <input id="sampleN" type="number" min="1" max="30" value="5" class="tiny"> strán rovnomerne zo všetkých</label>
+          <label class="check"><input type="radio" name="sampleSrc" value="pilot"> vybrané strany (<span id="pilotCount">0</span>)</label>
+        </div>
+        <p class="hint" id="sampleHint"></p>
+        <div class="row"><button id="runSample" class="primary needs-idle">▶ Spustiť skúšobný beh</button></div>
+      </div>
+
+      <div class="card" id="sampleCard">
+        <h3>Krok B – kontrola a schválenie</h3>
+        <div id="sampleEmpty" class="muted">Zatiaľ nebola spravená žiadna skúška.</div>
+        <div id="sampleBox" hidden>
+          <div class="estimate">
+            <div><span class="muted">Celá dávka</span><b id="estPages"></b></div>
+            <div><span class="muted">Odhad ceny (batch −50 %)</span><b id="estCost"></b></div>
+            <div><span class="muted">Priemer na stranu</span><b id="estAvg"></b></div>
+            <div><span class="muted">Skúška stála</span><b id="estSample"></b></div>
+          </div>
+          <p class="hint" id="sampleMeta"></p>
+          <table class="tbl" id="sampleTable"><thead><tr><th>Strana</th><th>in</th><th>out</th><th>Stav</th><th>Meno</th><th>Odpovede</th></tr></thead><tbody></tbody></table>
+          <p class="hint">Klikni na stranu – zobrazí sa originál vedľa vyťažených údajov. Skontroluj aspoň mená, odpovede a značky [?].</p>
+          <div id="sampleWarn" class="warn" hidden></div>
+          <div class="row">
+            <button id="approve" class="go needs-idle" disabled>✔ Schváliť a spustiť dávku</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 VÝSLEDKY -->
+    <section id="tab-results" class="tab">
+      <h2>Výsledky a export</h2>
+      <div class="card">
+        <div class="row between">
+          <h3>Odoslané dávky</h3>
+          <div class="row"><button id="serverList" class="needs-idle">Zoznam zo servera</button><button id="reloadBatches" class="ghost">Obnoviť</button></div>
+        </div>
+        <table class="tbl" id="batchTable"><thead><tr><th>Vytvorené</th><th>Id</th><th>Model</th><th>Strán</th><th>Výsledky</th><th></th></tr></thead><tbody></tbody></table>
+        <div id="batchEmpty" class="muted">V pracovnej zložke zatiaľ nie je žiadna dávka.</div>
+      </div>
+      <div class="card">
+        <h3>Export do Excelu</h3>
+        <div class="row">
+          <label class="check"><input type="radio" name="xlsxMode" value="students" checked> 1 riadok = 1 žiak (stĺpce Q1…Q76)</label>
+          <label class="check"><input type="radio" name="xlsxMode" value="pages"> 1 riadok = 1 strana</label>
+          <label class="inline" id="xlsxRowsBox" hidden>Rozbaliť pole na riadky <input id="xlsxRows" placeholder="(nič)" class="short"></label>
+        </div>
+        <div class="row" id="rosterBox">
+          <label class="inline">Zoznam žiakov na kontrolu mien</label>
+          <input id="roster" readonly placeholder="(nepovinné) _ziaci_vsetci_2026_2027.md alebo .txt s 1 menom na riadok">
+          <button id="pickRoster">Vybrať…</button><button id="clearRoster" class="ghost">Zrušiť</button>
+        </div>
+        <div class="row" id="classesBox">
+          <label class="inline">Len triedy zo zoznamu <input id="classes" class="short" placeholder="všetky"></label>
+          <span class="hint">napr. I.A, I.C, I.D – dotazník robili len prváci; prázdne = celý zoznam</span>
+        </div>
+        <div class="row">
+          <label class="inline">Súbor <input id="xlsxName" value="vysledky.xlsx" class="short"></label>
+          <button id="runExport" class="primary needs-idle">Exportovať</button>
+          <button id="openXlsx">Otvoriť Excel</button>
+        </div>
+        <p class="hint">Export spojí všetky stiahnuté <code>results_*.jsonl</code>. Pri režime „1 žiak“ sa strany spoja podľa prvej strany dotazníka;
+          hárok <i>kontrola_ziaci</i> vypíše chýbajúce strany a otázky, neisté mená, inú triedu a dvojité odpovede, hárok <i>kontrola</i> strany s chybou
+          a hárok <i>bez_dotaznika</i> žiakov zo zoznamu, ktorých dotazník sa nenašiel.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="console">
+  <div class="row between">
+    <div><span id="runState" class="state idle">pripravené</span> <code id="runCmd"></code></div>
+    <div class="row"><button id="cancelRun" class="ghost" disabled>Zrušiť</button><button id="clearLog" class="ghost">Vymazať</button></div>
+  </div>
+  <pre id="log"></pre>
+</footer>
+
+<!-- prehliadač výsledkov -->
+<div id="viewer" class="modal" hidden>
+  <div class="modal-box">
+    <div class="row between">
+      <h3 id="vTitle"></h3>
+      <div class="row"><button id="vPrev">◀</button><span id="vPos" class="muted"></span><button id="vNext">▶</button><button id="vClose">Zavrieť</button></div>
+    </div>
+    <div class="split">
+      <div class="imgpane"><img id="vImg" alt="originál strany"></div>
+      <div class="datapane" id="vData"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
