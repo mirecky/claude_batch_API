@@ -174,12 +174,22 @@
       <div class="card">
         <h3>Export do Excelu</h3>
         <div class="row">
+          <label class="check"><input type="radio" name="xlsxMode" value="students" checked> 1 riadok = 1 žiak (stĺpce Q1…Q76)</label>
+          <label class="check"><input type="radio" name="xlsxMode" value="pages"> 1 riadok = 1 strana</label>
+          <label class="inline" id="xlsxRowsBox" hidden>Rozbaliť pole na riadky <input id="xlsxRows" placeholder="(nič)" class="short"></label>
+        </div>
+        <div class="row" id="rosterBox">
+          <label class="inline">Zoznam žiakov na kontrolu mien</label>
+          <input id="roster" readonly placeholder="(nepovinné) napr. ziaci_vsetci.txt – 1 meno na riadok">
+          <button id="pickRoster">Vybrať…</button><button id="clearRoster" class="ghost">Zrušiť</button>
+        </div>
+        <div class="row">
           <label class="inline">Súbor <input id="xlsxName" value="vysledky.xlsx" class="short"></label>
-          <label class="inline">Rozbaliť pole na riadky <input id="xlsxRows" placeholder="(nič)" class="short"></label>
           <button id="runExport" class="primary needs-idle">Exportovať</button>
           <button id="openXlsx">Otvoriť Excel</button>
         </div>
-        <p class="hint">Export spojí všetky stiahnuté <code>results_*.jsonl</code>. Hárok <i>kontrola</i> obsahuje strany s chybou alebo upozornením.</p>
+        <p class="hint">Export spojí všetky stiahnuté <code>results_*.jsonl</code>. Pri režime „1 žiak“ sa strany spoja podľa prvej strany dotazníka;
+          hárok <i>kontrola_ziaci</i> vypíše chýbajúce strany a otázky, neisté mená a dvojité odpovede, hárok <i>kontrola</i> strany s chybou.</p>
       </div>
     </section>
   </main>

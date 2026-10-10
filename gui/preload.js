@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("api", {
   status: () => call("status"),
   saveSettings: (patch) => call("settings:save", patch),
   pickDir: (title) => call("dialog:dir", title),
+  pickFile: (title) => call("dialog:file", title),
   setKey: (key, ws) => call("key:set", key, ws),
   run: (script, args) => call("run", script, args),
   cancel: () => call("cancel"),

@@ -37,7 +37,7 @@ function loadSettings() {
 }
 let settings = null;
 function saveSettings(patch) {
-  const allowed = ["toolkitDir", "workDir", "python"];
+  const allowed = ["toolkitDir", "workDir", "python", "roster"];
   for (const k of allowed) if (typeof patch[k] === "string") settings[k] = patch[k].trim();
   fs.mkdirSync(path.dirname(SETTINGS_FILE()), { recursive: true });
   fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(settings, null, 1), "utf-8");
@@ -227,6 +227,11 @@ handle("status", () => status());
 handle("settings:save", (patch) => saveSettings(patch || {}));
 handle("dialog:dir", async (title) => {
   const r = await dialog.showOpenDialog(win, { title: String(title || "Vyber zložku"), properties: ["openDirectory", "createDirectory"] });
+  return r.canceled ? "" : r.filePaths[0];
+});
+handle("dialog:file", async (title) => {
+  const r = await dialog.showOpenDialog(win, { title: String(title || "Vyber súbor"), properties: ["openFile"],
+    filters: [{ name: "Text", extensions: ["txt", "csv", "md"] }, { name: "Všetky súbory", extensions: ["*"] }] });
   return r.canceled ? "" : r.filePaths[0];
 });
 handle("key:set", (key, ws) => {

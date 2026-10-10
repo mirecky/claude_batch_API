@@ -46,7 +46,7 @@ PowerShell otvor v zložke: v Prieskumníkovi klik do adresného riadku → nap�
    *Alternatíva k 3–6:* `py sample.py --list pilot.txt` → strany hneď cez okamžité API (plná cena) + odhad ceny celej dávky.
 7. **Skontrolovať pilot** (v chate s Claude – porovnať s originálom), upraviť `prompt.md` / `schema.json`, opakovať 4–7.
 8. **Ostrý beh:** `py submit.py --all --skip-probe` (pri rukopise `--hires`) → `py collect.py <id> --wait`
-9. `py export_xlsx.py --out vysledky.xlsx`
+9. `py export_xlsx.py --students --out vysledky.xlsx` → 1 riadok = 1 žiak (Q1…Q76); s `--roster ziaci_vsetci.txt` aj kontrola mien. Bez `--students` 1 riadok = 1 strana.
 
 Batch zvyčajne dobehne za minúty (pilot ~1 min, 126 strán ~20 min), garantované do 24 h. Výsledky sú na serveri 29 dní.
 

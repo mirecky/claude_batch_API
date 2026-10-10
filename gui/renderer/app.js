@@ -102,6 +102,7 @@ async function refreshStatus() {
   $("#toolkitDir").value = st.toolkitDir;
   $("#workDir").value = st.workDir;
   $("#python").value = st.python;
+  $("#roster").value = st.roster || "";
   $("#toolkitInfo").textContent = st.toolkitOk ? "Skripty nájdené." : `Chýba: ${st.toolkitMissing.join(", ")}`;
   $("#toolkitInfo").style.color = st.toolkitOk ? "" : "var(--err)";
   $("#keyInfo").textContent = st.keySet
@@ -374,10 +375,24 @@ $("#runExport").onclick = () => guard(async () => {
   const name = $("#xlsxName").value.trim() || "vysledky.xlsx";
   if (!/^[^\\/:*?"<>|]+\.xlsx$/i.test(name)) throw new Error("Názov súboru musí končiť .xlsx a nesmie obsahovať cestu.");
   const args = ["--out", name];
-  const rows = $("#xlsxRows").value.trim();
-  if (rows) args.push("--rows", rows);
+  if (document.querySelector('input[name="xlsxMode"]:checked').value === "students") {
+    args.push("--students");
+    if (S.st?.roster) args.push("--roster", S.st.roster);
+  } else {
+    const rows = $("#xlsxRows").value.trim();
+    if (rows) args.push("--rows", rows);
+  }
   await run("export_xlsx.py", args);
 });
+$$('input[name="xlsxMode"]').forEach((r) => r.addEventListener("change", () => {
+  const st = document.querySelector('input[name="xlsxMode"]:checked').value === "students";
+  $("#rosterBox").hidden = !st; $("#xlsxRowsBox").hidden = st;
+}));
+$("#pickRoster").onclick = () => guard(async () => {
+  const f = await window.api.pickFile("Zoznam žiakov (1 meno na riadok)");
+  if (f) { await window.api.saveSettings({ roster: f }); await refreshStatus(); }
+});
+$("#clearRoster").onclick = () => guard(async () => { await window.api.saveSettings({ roster: "" }); await refreshStatus(); });
 $("#openXlsx").onclick = () => guard(() => window.api.open($("#xlsxName").value.trim() || "vysledky.xlsx"));
 
 // ---------- prehliadač: originál vedľa vyťažených údajov ----------
