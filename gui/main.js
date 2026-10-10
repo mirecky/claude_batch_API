@@ -26,6 +26,7 @@ function defaults() {
     toolkitDir: path.resolve(__dirname, ".."),
     workDir: "",
     python: IS_WIN ? "py" : "python3",
+    classes: "I.A, I.C, I.D",
   };
 }
 function loadSettings() {
@@ -37,7 +38,7 @@ function loadSettings() {
 }
 let settings = null;
 function saveSettings(patch) {
-  const allowed = ["toolkitDir", "workDir", "python", "roster"];
+  const allowed = ["toolkitDir", "workDir", "python", "roster", "classes"];
   for (const k of allowed) if (typeof patch[k] === "string") settings[k] = patch[k].trim();
   fs.mkdirSync(path.dirname(SETTINGS_FILE()), { recursive: true });
   fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(settings, null, 1), "utf-8");

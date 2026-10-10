@@ -5,12 +5,13 @@ Použitie:
   py export_xlsx.py results_msgbatch_X.jsonl --out dotazniky.xlsx
   py export_xlsx.py --rows entries           # 1 riadok = 1 prvok poľa 'entries' (ak ho schéma má)
   py export_xlsx.py --students               # 1 riadok = 1 žiak (spojí strany dotazníka, stĺpce Q1…Q76)
-  py export_xlsx.py --students --roster ziaci_vsetci.txt   # + kontrola mien podľa zoznamu žiakov
+  py export_xlsx.py --students --roster _ziaci_vsetci_2026_2027.md --classes "I.A,I.C,I.D"   # + kontrola mien
 
 Hárok 'data'   : 1 riadok = 1 strana (alebo 1 prvok poľa --rows); vnorené polia ako JSON text.
 Hárok 'kontrola': strany s chybou / upozornením / bez dát.
 --students: hárok 'ziaci' (1 riadok = 1 žiak) + 'kontrola_ziaci' (chýbajúce strany/otázky, neisté mená…).
   Nový žiak začína stranou s is_first_page / page_in_form = 1, alebo keď číslo strany klesne.
+  S --roster: stĺpce zoznam_ziakov, trieda_zoznam, skupina + hárok 'bez_dotaznika' (žiaci zo zoznamu bez dotazníka).
 Zoradené podľa custom_id (= poradie strán v PDF). Ak sú v pages/manifest.csv, doplní pdf a stranu.
 Pre konkrétnu aplikáciu (presné stĺpce) si dajte v chate upraviť funkciu row_for().
 """
@@ -108,14 +109,83 @@ def group_students(seen, man):
                     cur["unc"].append(f"{u.get('where') or cid}: {u.get('read_as', '')}" + (f" (alebo: {', '.join(map(str, alt))})" if alt else ""))
     return studs
 
+ROMAN = {"1": "I", "2": "II", "3": "III", "4": "IV"}
+
+def norm_class(s):
+    """'1.A 2SK', 'I. A', 'i.a' → 'I.A'; nič rozpoznateľné → ''"""
+    m = re.search(r"(?<![A-Za-z])(IV|I{1,3}|[1-4])\s*\.?\s*([A-Da-d])(?![A-Za-z])", str(s or ""))
+    return f"{ROMAN.get(m.group(1), m.group(1).upper())}.{m.group(2).upper()}" if m else ""
+
+def load_roster(path, classes=None):
+    """Zoznam žiakov: Markdown (## trieda, **skupina**, '1. Priezvisko, Meno', poznámka '> … **Priezvisko, Meno** …')
+    alebo obyčajný text (1 meno na riadok)."""
+    p = Path(path)
+    out, trieda, skup = [], "", ""
+    md = p.suffix.lower() == ".md"
+    for line in p.read_text(encoding="utf-8-sig").splitlines():
+        t = line.strip()
+        if not t:
+            continue
+        if not md:
+            if not t.startswith("#"):
+                out.append({"meno": t, "trieda": "", "skupina": "", "pozn": ""})
+            continue
+        m = re.match(r"#{2,}\s*(.+)", t)
+        if m:
+            trieda, skup = norm_class(m.group(1)) or m.group(1).strip(), ""
+            continue
+        m = re.fullmatch(r"\*\*(.+?)\*\*\s*(\(\d+\))?", t)
+        if m:
+            skup = m.group(1).strip()
+            continue
+        m = re.match(r"\d+[.)]\s+(.+)", t)
+        if m:
+            out.append({"meno": m.group(1).strip(), "trieda": trieda, "skupina": skup, "pozn": ""})
+            continue
+        m = re.match(r">.*?\*\*([^*]+,[^*]+)\*\*\s*[—–-]?\s*(.*)", t)
+        if m:
+            out.append({"meno": m.group(1).strip(), "trieda": trieda, "skupina": "", "pozn": m.group(2).strip()[:120]})
+    if classes:
+        want = {norm_class(c) or c.strip() for c in classes}
+        out = [e for e in out if e["trieda"] in want]
+    return out
+
+def name_score(read, entry):
+    a, b = plain(read), plain(entry)
+    sc = difflib.SequenceMatcher(None, a, b).ratio()
+    ra, rb = a.split(), b.split()
+    for t in [x for x in ra if len(x) >= 3]:            # priezvisko + iniciály: „J. Pápay“ ~ „Pápay, Ján“
+        hit = next((y for y in rb if difflib.SequenceMatcher(None, t, y).ratio() >= 0.85), None)
+        if hit:
+            rest_a, rest_b = [x for x in ra if x != t], [y for y in rb if y != hit]
+            if rest_a and all(len(x) == 1 for x in rest_a) and all(any(y.startswith(x) for y in rest_b) for x in rest_a):
+                sc = max(sc, 0.9)
+            elif not rest_a:
+                sc = max(sc, 0.86)                       # len priezvisko
+    return sc
+
+def match_name(read, roster):
+    """→ (záznam zo zoznamu alebo None, stav: ok / neiste / nejednoznacne / nenajdene, text)"""
+    if not plain(read) or not roster:
+        return None, "nenajdene", ""
+    sc = sorted(((name_score(read, e["meno"]), i) for i, e in enumerate(roster)), reverse=True)
+    best, bi = sc[0]
+    e = roster[bi]
+    if best >= 0.85:
+        others = [roster[i]["meno"] for s2, i in sc[1:] if s2 >= 0.85 and s2 >= best - 0.03]
+        if others:
+            return None, "nejednoznacne", " / ".join([e["meno"]] + others)
+        return e, "ok", e["meno"]
+    if best >= 0.6:
+        return None, "neiste", e["meno"]
+    return None, "nenajdene", ""
+
 def student_rows(studs, roster):
+    """roster = zoznam záznamov z load_roster() alebo []; vráti (riadky žiakov, kontrola, žiaci bez dotazníka)"""
     allq = sorted({q for s in studs for q in s["ans"]}, key=qsort)
     qn = [int(q[1:]) for q in allq if re.fullmatch(r"Q\d+", q)]
     form_pages = max((p for s in studs for p in s["pif"]), default=0)
-    names = []
-    if roster:
-        names = [l.strip() for l in Path(roster).read_text(encoding="utf-8-sig").splitlines() if l.strip() and not l.startswith("#")]
-    rows, check = [], []
+    rows, check, used = [], [], {}
     for n, s in enumerate(studs, 1):
         h = s["head"]
         miss_p = sorted(set(range(1, form_pages + 1)) - set(s["pif"]))
@@ -129,25 +199,37 @@ def student_rows(studs, roster):
                 s["prob"].append("v prepise chýbajú " + ranges(miss_q))
         row = {"poradie": n, "pdf": s["pdf"], "strany": f"{s['pages'][0]} … {s['pages'][-1]}" if len(s["pages"]) > 1 else s["pages"][0]}
         row.update({col: h.get(k, "") for k, col in HEAD})
-        if names:
-            best, score = "", 0.0
-            for line in names:
-                sc = difflib.SequenceMatcher(None, plain(h.get("student_name", "")), plain(line)).ratio()
-                if sc > score:
-                    best, score = line, sc
-            if score >= 0.85:
-                row["zoznam_ziakov"] = best
-            else:
-                row["zoznam_ziakov"] = f"? {best}" if score >= 0.6 else ""
-                s["prob"].append(f"meno nie je v zozname žiakov" + (f" (najbližšie: {best})" if score >= 0.6 else ""))
+        if roster:
+            e, st, txt = match_name(h.get("student_name", ""), roster)
+            row["zoznam_ziakov"] = txt if st == "ok" else (f"? {txt}" if txt else "")
+            row["trieda_zoznam"] = e["trieda"] if e else ""
+            row["skupina"] = e["skupina"] if e else ""
+            if e:
+                used.setdefault(id(e), []).append(n)
+                if e["pozn"]:
+                    s["prob"].append(f"poznámka v zozname: {e['pozn']}")
+                tf = norm_class(h.get("class_name", ""))
+                if tf and e["trieda"] and tf != e["trieda"]:
+                    s["prob"].append(f"trieda v dotazníku {h.get('class_name')} ≠ v zozname {e['trieda']}")
+            elif h.get("student_name"):
+                s["prob"].append({"neiste": f"meno nie je isté (najbližšie: {txt})",
+                                  "nejednoznacne": f"meno sa zhoduje s viacerými žiakmi: {txt}"}.get(st, "meno nie je v zozname žiakov"))
         for q in allq:
             row[q] = s["ans"].get(q, "")
         row["neiste"] = "\n".join(s["unc"])
-        row["na_kontrolu"] = "; ".join(s["prob"])
+        row["na_kontrolu"] = s["prob"]
         rows.append(row)
-        for p in s["prob"]:
-            check.append({"poradie": n, "meno": h.get("student_name", ""), "pdf": s["pdf"], "problem": p})
-    return rows, check
+    for nums in used.values():                          # dva dotazníky priradené tomu istému žiakovi
+        if len(nums) > 1:
+            for n in nums:
+                rows[n - 1]["na_kontrolu"].append("rovnaký žiak ako č. " + ", ".join(str(x) for x in nums if x != n))
+    for r in rows:
+        for p in r["na_kontrolu"]:
+            check.append({"poradie": r["poradie"], "meno": r["meno"], "pdf": r["pdf"], "problem": p})
+        r["na_kontrolu"] = "; ".join(r["na_kontrolu"])
+    missing = [{"trieda": e["trieda"], "skupina": e["skupina"], "meno": e["meno"], "poznamka": e["pozn"]}
+               for e in roster if id(e) not in used]
+    return rows, check, missing
 
 def write(path, sheets):
     wb = Workbook()
@@ -171,7 +253,8 @@ def main():
     ap.add_argument("--out", default="vysledky.xlsx")
     ap.add_argument("--rows", help="názov poľa, ktoré sa rozbalí na viac riadkov (napr. entries)")
     ap.add_argument("--students", action="store_true", help="1 riadok = 1 žiak (spojí strany dotazníka)")
-    ap.add_argument("--roster", help="zoznam žiakov (1 meno na riadok) na kontrolu prečítaných mien")
+    ap.add_argument("--roster", help="zoznam žiakov (.md po triedach alebo .txt 1 meno na riadok) na kontrolu mien")
+    ap.add_argument("--classes", help="len tieto triedy zo zoznamu, napr. \"I.A,I.C,I.D\"")
     a = ap.parse_args()
     files = [Path(f) for f in a.files] or sorted(Path(".").glob("results_*.jsonl"))
     if not files:
@@ -201,9 +284,16 @@ def main():
         else:
             rows.append(row_for(base, d))
     if a.students:
-        srows, scheck = student_rows(group_students(seen, man), a.roster)
-        write(a.out, [("ziaci", srows), ("kontrola_ziaci", scheck), ("kontrola", check)])
-        print(f"{a.out}: {len(srows)} žiakov, na kontrolu {len({c['poradie'] for c in scheck})} žiakov, {len(check)} strán")
+        roster = load_roster(a.roster, a.classes.split(",") if a.classes else None) if a.roster else []
+        if a.roster and not roster:
+            sys.exit(f"V zozname {a.roster} som nenašiel žiadne mená" + (f" pre triedy {a.classes}" if a.classes else "") + ".")
+        srows, scheck, missing = student_rows(group_students(seen, man), roster)
+        sheets = [("ziaci", srows), ("kontrola_ziaci", scheck), ("kontrola", check)]
+        if roster:
+            sheets.append(("bez_dotaznika", missing))
+        write(a.out, sheets)
+        print(f"{a.out}: {len(srows)} žiakov, na kontrolu {len({c['poradie'] for c in scheck})} žiakov, {len(check)} strán"
+              + (f"; v zozname {len(roster)} žiakov, bez dotazníka {len(missing)}" if roster else ""))
         return
     write(a.out, [("data", rows), ("kontrola", check)])
     print(f"{a.out}: {len(rows)} riadkov, na kontrolu {len(check)}")

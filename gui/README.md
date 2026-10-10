@@ -20,7 +20,7 @@ Iný spôsob: v PowerShell v zložke `gui` príkazy `npm install` a potom `npm s
 | 2 Príprava strán | vyberieš zložku s PDF (pri rukopise zaškrtneš `--hires`), prípadne označíš skúšobné strany | `prepare.py` |
 | 3 Zadanie | úprava `prompt.md` a `schema.json` (ukladá sa do pracovnej zložky) | – |
 | 4 Skúška a spustenie | **A:** skúšobný beh na niekoľkých stranách → odhad ceny celej dávky; **B:** kontrola výsledkov vedľa originálu → tlačidlo *Schváliť a spustiť dávku* | `sample.py`, potom `submit.py --all --skip-probe` |
-| 5 Výsledky a export | čakanie a stiahnutie výsledkov, prehliadanie, export do Excelu (predvolene 1 riadok = 1 žiak, voliteľne kontrola mien podľa zoznamu žiakov) | `collect.py`, `export_xlsx.py --students` |
+| 5 Výsledky a export | čakanie a stiahnutie výsledkov, prehliadanie, export do Excelu (predvolene 1 riadok = 1 žiak, voliteľne kontrola mien a tried podľa zoznamu žiakov a zoznam žiakov bez dotazníka) | `collect.py`, `export_xlsx.py --students` |
 
 ### Skúšobný beh a schválenie
 

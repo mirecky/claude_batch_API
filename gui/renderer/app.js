@@ -103,6 +103,7 @@ async function refreshStatus() {
   $("#workDir").value = st.workDir;
   $("#python").value = st.python;
   $("#roster").value = st.roster || "";
+  $("#classes").value = st.classes ?? "";
   $("#toolkitInfo").textContent = st.toolkitOk ? "Skripty nájdené." : `Chýba: ${st.toolkitMissing.join(", ")}`;
   $("#toolkitInfo").style.color = st.toolkitOk ? "" : "var(--err)";
   $("#keyInfo").textContent = st.keySet
@@ -377,7 +378,12 @@ $("#runExport").onclick = () => guard(async () => {
   const args = ["--out", name];
   if (document.querySelector('input[name="xlsxMode"]:checked').value === "students") {
     args.push("--students");
-    if (S.st?.roster) args.push("--roster", S.st.roster);
+    if (S.st?.roster) {
+      args.push("--roster", S.st.roster);
+      const cls = $("#classes").value.split(",").map((x) => x.trim()).filter(Boolean);
+      if (cls.length) args.push("--classes", cls.join(","));
+      if ($("#classes").value !== (S.st.classes || "")) await window.api.saveSettings({ classes: $("#classes").value });
+    }
   } else {
     const rows = $("#xlsxRows").value.trim();
     if (rows) args.push("--rows", rows);
@@ -386,7 +392,7 @@ $("#runExport").onclick = () => guard(async () => {
 });
 $$('input[name="xlsxMode"]').forEach((r) => r.addEventListener("change", () => {
   const st = document.querySelector('input[name="xlsxMode"]:checked').value === "students";
-  $("#rosterBox").hidden = !st; $("#xlsxRowsBox").hidden = st;
+  $("#rosterBox").hidden = $("#classesBox").hidden = !st; $("#xlsxRowsBox").hidden = st;
 }));
 $("#pickRoster").onclick = () => guard(async () => {
   const f = await window.api.pickFile("Zoznam žiakov (1 meno na riadok)");
